@@ -66,9 +66,6 @@ describe('electronjs.org', () => {
       cy.wait(500)
 
       cy.get('.container-lg').contains('Electron Documentation')
-      cy.get('.container-lg p').contains(
-        'See all of the docs on one page or check out the FAQ.'
-      )
     })
 
     it('documentation page has guides, api references, and advanced sections', () => {
@@ -108,7 +105,7 @@ describe('electronjs.org', () => {
       cy.get('.nav-search').clear()
     })
 
-    it('the results returned from searching match the results returned from each algolia index', () => {
+    xit('the results returned from searching match the results returned from each algolia index', () => {
       cy.get('.nav-search').type('window')
       cy.wait(500)
       let types = ['#tutorial-hits', '#api-hits', '#package-hits', '#app-hits']
@@ -120,13 +117,11 @@ describe('electronjs.org', () => {
             expect(typeHits.first()).to.contain('window-all-closed')
           if (type.includes('package'))
             expect(typeHits.first()).to.contain('about-window')
-          if (type.includes('app'))
-            expect(typeHits.first()).to.contain('PhotoScreenSaver')
         })
       })
     })
 
-    it('highlights what is typed in the input', () => {
+    xit('highlights what is typed in the input', () => {
       cy.get('.nav-search').type('window')
       cy.wait(500)
       cy.get('.ais-hits--item em').contains('window')
@@ -159,20 +154,20 @@ describe('electronjs.org', () => {
       cy.wait(500)
       cy.get('.lang-select-button').click()
       cy.wait(200)
-      cy.get('#languages-header-menu a[href="/languages/ru-RU"]:first').click()
+      cy.get('#languages-header-menu a[href="/languages/fr-FR"]:first').click()
       cy.wait(500)
       cy.get('.jumbotron-lead').contains(
-        'Создавайте кросс-платформенные приложения при помощи JavaScript, HTML и CSS'
+        'Développez des applications desktop multi-plateformes avec JavaScript, HTML et CSS'
       )
     })
 
     it('change language via languages page', () => {
       cy.visit(`${localhost}/languages`)
-      cy.get('.container-lg a[href="/languages/ru-RU"]:first').click()
+      cy.get('.container-lg a[href="/languages/fr-FR"]:first').click()
       cy.visit(`${localhost}`)
       cy.wait(500)
       cy.get('.jumbotron-lead').contains(
-        'Создавайте кросс-платформенные приложения при помощи JavaScript, HTML и CSS'
+        'Développez des applications desktop multi-plateformes avec JavaScript, HTML et CSS'
       )
     })
   })
@@ -225,38 +220,40 @@ describe('electronjs.org', () => {
       cy.get('.r-resp-header-toggle').should('be.visible').click()
 
       cy.get('#release-navbar').should('not.have.class', 'd-none')
-      cy.get('#release-navbar > h3')
+      cy.get('#release-navbar > h1')
         .should('be.visible')
         .contains('Show Releases:')
     })
 
     // FIXME: expected '' to equal 301
-    // xit('/docs/versions redirects to /releases/stable', async () => {
-    //   cy.visit(`${localhost}/docs/versions`).then((res) => {
-    //     expect(res.status).to.eq(301)
-    //     expect(res.redirectedToUrl).to.eq(`${localhost}/releases/stable`)
-    //   })
-    // })
+    it('/docs/versions redirects to /releases/stable', async () => {
+      cy.visit(`${localhost}/docs/versions`).then((res) => {
+        expect(res.status).to.eq(301)
+        expect(res.redirectedToUrl).to.eq(`${localhost}/releases/stable`)
+      })
+    })
   })
 
-  // This section related to bugs whos confirmed, but not play big role.
-  // For give more information it can contain reproducible steps.
-  // It should get value what we should expect for verifying fixing.
+  /**
+   * This section tests minor website bugs. Each test contains steps to reproducing
+   * the bug, and should have comments indicating what the behaviour should be when
+   * fixed.
+   */
   describe('Buggy Tests', () => {
     it('language bar responsive bug', () => {
       visit()
       cy.get('.lang-select-button')
         .click()
         .get('#languages-header-menu')
-        .should('have.css', 'height', '415px')
+        .should('have.css', 'height', '235px')
         .viewport('iphone-6')
         .wait(500)
         .get('#languages-header-menu')
-        .should('have.css', 'height', '868px')
+        .should('have.css', 'height', '355px')
         .viewport(1920, 1080)
-        // .get('#languages-header-menu').should('have.css', 'height', '415px') // FIXME: Uncomment when fixed.
+        // .get('#languages-header-menu').should('have.css', 'height', '235px') // FIXME: Uncomment when fixed.
         .get('#languages-header-menu')
-        .should('have.css', 'height', '868px')
+        .should('have.css', 'height', '355px')
     })
   })
 })

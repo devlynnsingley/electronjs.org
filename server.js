@@ -8,10 +8,10 @@ const lobars = require('lobars')
 
 // Middleware
 const hbs = require('express-hbs')
+const useragent = require('express-useragent')
 const compression = require('compression')
 const slashes = require('connect-slashes')
 const browsersync = require('./middleware/browsersync')
-const browserify = require('./middleware/browserify')
 const requestLanguage = require('express-request-language')
 const cookieParser = require('cookie-parser')
 const sass = require('./middleware/sass')
@@ -19,10 +19,18 @@ const helmet = require('helmet')
 const langResolver = require('./middleware/lang-resolver')
 const contextBuilder = require('./middleware/context-builder')
 const getOcticons = require('./middleware/register-octicons')
+const feedback = require('./middleware/feedback')
 
 const port = Number(process.env.PORT) || argv.p || argv.port || 5000
 const app = express()
 const appImgDir = path.resolve(require.resolve('electron-apps'), '..', 'apps')
+
+const isProduction = process.env.NODE_ENV === 'production'
+
+const staticSettings = {
+  redirect: false,
+  maxAge: isProduction ? 31557600000 : 0,
+}
 
 // Handlebars Templates
 hbs.registerHelper(lobars)
@@ -76,15 +84,68 @@ app.use(
     referrerPolicy: false,
   })
 )
-if (process.env.NODE_ENV === 'production') {
-  console.log('Production app detected; serving JS and CSS from disk')
-  app.use(
-    express.static(path.join(__dirname, 'precompiled'), { redirect: false })
-  )
+if (isProduction) {
+  const jsManifest = require(path.join(
+    __dirname,
+    'precompiled',
+    'scripts',
+    'manifest.json'
+  ))
+  const cssManifest = require(path.join(
+    __dirname,
+    'precompiled',
+    'styles',
+    'manifest.json'
+  ))
+  const imagesManifest = require(path.join(
+    __dirname,
+    'precompiled',
+    'images',
+    'manifest.json'
+  ))
+  hbs.registerHelper('static-asset', (type, ...parts) => {
+    // `parts` should be at minimum [name, function]
+    // but it could also be [part1, part2, part3, function ]
+    // if we want to link to dynamic images
+    const name = parts.length === 2 ? parts[0] : parts.slice(0, -1).join('')
+
+    if (type === 'js') {
+      return jsManifest[name] || 'unknown.name'
+    }
+    if (type === 'css') {
+      return cssManifest[name] || 'unknown.name'
+    }
+    if (type === 'image') {
+      return imagesManifest[name] || 'unknown.name'
+    }
+    return 'unknown.type'
+  })
 } else {
+  hbs.registerHelper('static-asset', (type, ...parts) => {
+    const name = parts.length === 2 ? parts[0] : parts.slice(0, -1).join('')
+
+    if (type === 'js') {
+      return `/scripts/${name}`
+    }
+    if (type === 'css') {
+      return `/styles/${name}`
+    }
+    if (type === 'image') {
+      return `/images${name}`
+    }
+    return 'unknown.type'
+  })
+}
+if (isProduction) {
+  console.log('Production app detected; serving JS and CSS from disk')
+  app.use(express.static(path.join(__dirname, 'precompiled'), staticSettings))
+} else if (process.env.NODE_ENV === 'development') {
   console.log('Dev app detected; compiling JS and CSS in memory')
   app.use(sass())
-  app.use('/scripts/index.js', browserify('scripts/index.js'))
+  const webpack = require('./middleware/webpack')
+  app.use(webpack())
+} else {
+  app.use(sass())
 }
 app.get('/service-worker.js', (req, res) =>
   res.sendFile(path.resolve(__dirname, 'scripts', 'service-worker.js'))
@@ -100,12 +161,13 @@ app.use(
     },
   })
 )
-app.use(express.static(path.join(__dirname, 'public'), { redirect: false }))
-app.use('/app-img', express.static(appImgDir, { redirect: false }))
+app.use(express.static(path.join(__dirname, 'public'), staticSettings))
+app.use('/images/app-img', express.static(appImgDir, staticSettings))
 app.use(slashes(false))
 app.use(langResolver)
 app.use(contextBuilder)
 app.use(browsersync())
+app.use(useragent.express())
 
 // Routes
 const routes = require('./routes')
@@ -123,6 +185,7 @@ app.get('/community', routes.community)
 app.get('/contact', (req, res) => res.redirect(301, '/community'))
 app.use('/crowdin', routes.languages.proxy)
 app.get('/devtron', routes.devtron)
+app.use('/docs', feedback)
 app.get('/docs', routes.docs.index)
 app.get('/docs/versions', (req, res) => res.redirect(301, '/releases/stable'))
 app.get('/docs/:category', routes.docs.category)
@@ -186,7 +249,7 @@ app.use(routes._404)
 if (!module.parent) {
   app.listen(port, () => {
     console.log(`app running on http://localhost:${port}`)
-    if (process.env.NODE_ENV === 'production') {
+    if (isProduction) {
       console.log(`If you're developing, you probably want \`npm run dev\`\n\n`)
     }
   })
